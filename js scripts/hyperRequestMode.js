@@ -1,7 +1,9 @@
 
 const stripeAPIKey = "pk_live_51GXa1YLZrAkO7Fk2tcUO7vabkO7sgDamOww2OPYQVFhPZOllT75f7owzIOlP75MMdDXHKoy6wPt40HsuQDObpkHv004T74fAzs";
 
+// This is the second function to run (303)
 async function getStripeToken(profile, isBillingAddressRequired) {
+  
 
   let body = new URLSearchParams({
     "type": "card",
@@ -41,6 +43,7 @@ async function getStripeToken(profile, isBillingAddressRequired) {
   }
 }
 
+// This is the third function to run (310)
 async function submitPayment(profile, accountID, releaseID, stripeToken = null, isBotProtectionEnabled, loginRequired, isBillingAddressRequired) {
 
   // Get user
@@ -136,6 +139,7 @@ async function submitPayment(profile, accountID, releaseID, stripeToken = null, 
   return res
 }
 
+// This is the fifth function to run (320)
 async function checkStatus(accountID, productName, productCurrency, productPrice, productImage, baseURL, checkoutID, controller, timeMS) {
   const response = await fetch(window.location.origin + '/ajax/checkouts/' + checkoutID, {
     method: 'GET',
@@ -166,6 +170,7 @@ async function checkStatus(accountID, productName, productCurrency, productPrice
   }, 20)
 }
 
+// This is the fourth function to run (inside submitPayment)
 async function getBotdetectionVariables() {
   const codeToInject = `
         (async () => {
@@ -200,6 +205,7 @@ async function getBotdetectionVariables() {
   return variant
 }
 
+// This is the first function to run (290)
 async function getReleaseId(buildId) {
   const response = await fetch(window.location.origin + '/_next/data/' + buildId + '/purchase.json?password=', {
     headers: {
@@ -228,6 +234,7 @@ async function getReleaseId(buildId) {
   }
 }
 
+// This is the main function, all the other functions are calld here
 async function start(profile, controller, countdownPage) {
   // Check Page
   const hyperURLRegex = /(http(?:s)?:\/\/.*)\/purchase\/.*\?password=(.*)/
@@ -330,6 +337,7 @@ async function start(profile, controller, countdownPage) {
     controller.reportDecline(productName, null, null, productImage)
   }
 }
+
 // var timeMS = new Date();
 (async () => {
   await waitForWindow()
