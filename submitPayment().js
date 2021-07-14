@@ -1,30 +1,43 @@
 const stripeAPIKey = "sk_test_51J6GidJv72LSDDQAtC0FKAKWEF8AcCbZ3eTF69APf2i4gnQlvmQf5bmLXE1vETnUCa0aB5eKrxnRZpGLUB2tMHrM005mt1npYj"
 
-async function getStripeToken() {
+
+// This is the second function to run (303)
+async function getStripeToken(profile, isBillingAddressRequired) {
     
-  let postBody = {
+  let body = new URLSearchParams({
       "type": "card",
+      "billing_details[name]": profile.details.personInfo.fullName,
+      "billing_details[email]": profile.details.personInfo.email,
+      "billing_details[address][postal_code]": profile.details.shippingInfo.zipCode,
       "card[number]" : '5253185059339046',
       "card[exp_month]" : 10,
       "card[exp_year]" : 26,
       "card[cvc]" : 992
+  })
+
+  if (isBillingAddressRequired) {
+    body.append("billing_details[address][city]", profile.details.shippingInfo.city)
+    body.append("billing_details[address][country]", profile.details.shippingInfo.countryCode)
+    body.append("billing_details[address][line1]", profile.details.shippingInfo.addressLine1)
+    body.append("billing_details[address][line2]", profile.details.shippingInfo.addressLine2)
+    body.append("billing_details[address][state]", profile.details.shippingInfo.stateCode)
   }
-  
+
   const response = await fetch("https://api.stripe.com/v1/payment_methods", {
-      "type": "card",
       "method": "POST",
       "headers": {
           "Content-Type": "application/x-www-form-urlencoded",
           "Authorization": `Bearer ${stripeAPIKey}`
       },
-      "body": postBody1
+      "body": body
   })
 
   const responseJSON = await response.json()
-  console.log(responseJSON)
+  console.log("////getStripeToken, responseJSON: ", responseJSON)
   return responseJSON.id
 }
 
+// This is the third function to run (310)
 async function submitPayment(profile, accountID, releaseID, stripeToken = null, isBotProtectionEnabled, loginRequired, isBillingAddressRequired) {
 
   // Get user
@@ -100,13 +113,13 @@ async function submitPayment(profile, accountID, releaseID, stripeToken = null, 
     })
       // .then(handleErrors)
       .then(async (response) => {
-        console.log(response)
+        console.log("////submitPayment, response: ", response)
         if (response.status === 200) {
           const responseJSON = await response.json()
-          console.log(responseJSON)
+          console.log("responseJSON: ", responseJSON)
           return responseJSON.id
         } else if (response.status !== 200) {
-          console.log(response.status)
+          console.log("response.status: ", response.status)
           return "ERROR"
           // throw new Error('Something went wrong')
         }
@@ -127,14 +140,12 @@ async function checkStatus(accountID, productName, productCurrency, productPrice
       'Hyper-Account': accountID,
     }
   })
-  console.log(response)
+  console.log("////checkStatus, response: ", response)
   const responseJSON = await response.json()
-  // await new Promise(r => setTimeout(r, 1000))
   const licenseKey = responseJSON?.license?.key || ''
   const status = responseJSON.status
-  // console.log(responseJSON)
   if (response.status === 200) {
-    console.log(responseJSON)
+    console.log("responseJSON: ", responseJSON)
     // if (licenseKey) {
     if (status == 'failed') {
       // document.title = "Checkout failed"
@@ -145,6 +156,7 @@ async function checkStatus(accountID, productName, productCurrency, productPrice
   }
 }
 
+// This is the fourth function to run (inside submitPayment)
 async function getBotdetectionVariables() {
   const codeToInject = `
         (async () => {
@@ -179,9 +191,40 @@ async function getBotdetectionVariables() {
   return variant
 }
 
+// This is the first function to run (290)
+async function getReleaseId(buildId) {
+  const response = await fetch(window.location.origin + '/_next/data/' + buildId + '/purchase.json?password=', {
+    headers: {
+      accept: '*/*',
+      'accept-language': 'en-US,en;q=0.9,ar;q=0.8',
+      'if-none-match': 'W/"65b-Pom4TyQ+TJtFlJo0llcjJADMspU"',
+      'sec-ch-ua': '" Not A;Brand";v="99", "Chromium";v="90", "Google Chrome";v="90"',
+      'sec-ch-ua-mobile': '?0',
+      'sec-fetch-dest': 'empty',
+      'sec-fetch-mode': 'cors',
+      'sec-fetch-site': 'same-origin'
+    },
+    referrer: window.location.origin + '/countdown',
+    referrerPolicy: 'strict-origin-when-cross-origin',
+    body: null,
+    method: 'GET',
+    mode: 'cors',
+    credentials: 'include'
+  })
+  console.log("////getReleaseId, response: ", response)
+  if (response.status === 200) {
+    const responseJSON = await response.json()
+    const releaseId = responseJSON?.pageProps?.release?.id
+    console.log("releaseId: ", releaseId)
+    return releaseId
+  }
+}
+
+// This is the main function, all the other functions are calld here
 async function start(profile) {
   // Check Page
-  const hyperURLRegex = /(http(?:s)?:\/\/.*)\/purchase\/.*\?password=(.*)/
+  // const hyperURLRegex = /(http(?:s)?:\/\/.*)\/purchase\/.*\?password=(.*)/
+  const hyperURLRegex = /(http(?:s)?:\/\/.*)(?:\/|%2F)purchase(?:\/|%2F).*(?:\?|%3F)password=(.*)/
   const urlRegexMatches = location.href.match(hyperURLRegex)
 
   if (urlRegexMatches) {
@@ -199,7 +242,7 @@ async function start(profile) {
   // get account info
   const raw = document.querySelector('#__NEXT_DATA__')?.innerText
   const parsed = JSON.parse(raw)
-  console.log(parsed);
+  console.log("////start, parsed: ", parsed);
   // get product name and image for checkout success ** NO NEED WITH CLI BOT **
   const productName = parsed?.props?.pageProps?.account?.name
   const productImage = parsed?.props?.pageProps?.account?.settings?.branding?.logo
@@ -220,17 +263,21 @@ async function start(profile) {
 
   // login required each user should be logged in before buying license key
   const loginRequired = parsed?.props?.pageProps?.account?.settings?.payments?.require_login
-  console.log(loginRequired)
+  console.log("loginRequired: ", loginRequired)
   // get release info
   const releaseInfo = parsed.props.pageProps.release
   // get release info id
   let releaseId = releaseInfo?.id
-  console.log(releaseId)
-
-
+  console.log("releaseId: ", releaseId)
+  if (!releaseId) {
+    buildId = parsed?.buildId
+    console.log("buildId: ", buildId)
+    releaseId = await getReleaseId(buildId)
+  }
+  
   let stripeToken = null
   let isBillingAddressRequired = false;
-  console.log(releaseInfo?.plan?.type)
+  console.log("releaseInfo?.plan?.type: ", releaseInfo?.plan?.type)
   if (releaseInfo?.plan?.type != 'free') {
 
     // Check if the address is required
@@ -240,28 +287,26 @@ async function start(profile) {
 
     stripeToken = await getStripeToken(profile, isBillingAddressRequired)
   }
-  console.log(stripeToken)
+  console.log("stripeToken: ", stripeToken)
   if (stripeToken != null || releaseInfo?.plan?.type === 'free' || !releaseInfo?.plan?.type) {
 
     const checkoutID = await submitPayment(profile, accountID, releaseId, stripeToken, isBotProtectionEnabled, loginRequired, isBillingAddressRequired).catch(() => null)
 
-    console.log(checkoutID)
+    console.log("checkoutID: ", checkoutID)
     if (checkoutID !== null && checkoutID !== "undefined" && checkoutID !== "ERROR") {
-      console.log("CheckoutID")
+      console.log("CheckoutID: ", checkoutID)
       await checkStatus(accountID, productName, productCurrency, productPrice, productImage, baseURL, checkoutID)
     } else if (checkoutID === "ERROR") {
-      console.log(loginRequired)
       if (loginRequired) {
         console.log("bug, login required")
       }
     } else if (checkoutID === null || typeof checkoutID === undefined) {
       console.log("should clear the interval")
     }
-
   } 
 }
 
-
+// This is the main code
 const profile = {
   "details" : {
     "personInfo" : { 
@@ -280,16 +325,13 @@ const profile = {
 }
 
 // get the url
-var hyperURLRegex2 = /(http(?:s)?:\/\/.*)\/purchase\/.*\?password=(.*)/
+//var hyperURLRegex2 = /(http(?:s)?:\/\/.*)\/purchase\/.*\?password=(.*)/
+var hyperURLRegex2 = /(http(?:s)?:\/\/.*)(?:\/|%2F)purchase(?:\/|%2F).*(?:\?|%3F)password(?:=|%3D)(.*)/
 // https://mistic.metalabs.gg/purchase/l7UvPwy6VBSuWlqXGLXae?password=CometSolutions
 // check if the url match the regex it should be (https://)
 var urlRegexMatches2 = location.href.match(hyperURLRegex2)
-console.log(hyperURLRegex2)
-console.log(urlRegexMatches2)
 if (urlRegexMatches2) {
   await start(profile)
 }
 
 // end
-
-
