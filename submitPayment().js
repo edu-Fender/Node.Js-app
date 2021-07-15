@@ -41,7 +41,6 @@ async function getStripeToken(profile, isBillingAddressRequired) {
 async function submitPayment(profile, accountID, releaseID, stripeToken = null, isBotProtectionEnabled, loginRequired, isBillingAddressRequired) {
 
   // Get user
-  
   const userResponse = await fetch(window.location.origin + "/ajax/user", {
     "method": "GET",
     "headers": {
@@ -133,7 +132,7 @@ async function submitPayment(profile, accountID, releaseID, stripeToken = null, 
 }
 
 // This is the fifth function to run (320)
-async function checkStatus(accountID, productName, productCurrency, productPrice, productImage, baseURL, checkoutID) {
+async function checkStatus(accountID, baseURL, checkoutID) {
   const response = await fetch(window.location.origin + '/ajax/checkouts/' + checkoutID, {
     method: 'GET',
     headers: {
@@ -151,7 +150,7 @@ async function checkStatus(accountID, productName, productCurrency, productPrice
       // document.title = "Checkout failed"
     } else if (licenseKey != null) {
       var message = licenseKey === '' ? 'Check your email' : licenseKey
-      console.log(message)
+      console.log("licensekey: ", message)
     }
   }
 }
@@ -238,16 +237,10 @@ async function start(profile) {
     var baseURL = window.location.origin // e.g. https://dashboard.the-lab.co.uk
   }
 
-
   // get account info
   const raw = document.querySelector('#__NEXT_DATA__')?.innerText
   const parsed = JSON.parse(raw)
   console.log("////start, parsed: ", parsed);
-  // get product name and image for checkout success ** NO NEED WITH CLI BOT **
-  const productName = parsed?.props?.pageProps?.account?.name
-  const productImage = parsed?.props?.pageProps?.account?.settings?.branding?.logo
-  const productPrice = (parseInt(parsed?.props?.pageProps?.release?.plan?.amount) / 100)
-  const productCurrency = parsed?.props?.pageProps?.release?.plan?.currency
 
   // build id is the release build random id for each release
   let buildId = parsed?.buildId
@@ -257,15 +250,19 @@ async function start(profile) {
 
   // account id is the id of the company that makes that release
   const accountID = parsed?.props?.pageProps?.account?.id
+  console.log("accountID: ", accountID)
 
   // bot protection
   const isBotProtectionEnabled = parsed?.props?.pageProps?.account?.settings?.bot_protection?.enabled
+  console.log("isBotProtectionEnabled: ", isBotProtectionEnabled)
 
   // login required each user should be logged in before buying license key
   const loginRequired = parsed?.props?.pageProps?.account?.settings?.payments?.require_login
   console.log("loginRequired: ", loginRequired)
+
   // get release info
   const releaseInfo = parsed.props.pageProps.release
+
   // get release info id
   let releaseId = releaseInfo?.id
   console.log("releaseId: ", releaseId)
@@ -291,11 +288,10 @@ async function start(profile) {
   if (stripeToken != null || releaseInfo?.plan?.type === 'free' || !releaseInfo?.plan?.type) {
 
     const checkoutID = await submitPayment(profile, accountID, releaseId, stripeToken, isBotProtectionEnabled, loginRequired, isBillingAddressRequired).catch(() => null)
-
     console.log("checkoutID: ", checkoutID)
+
     if (checkoutID !== null && checkoutID !== "undefined" && checkoutID !== "ERROR") {
-      console.log("CheckoutID: ", checkoutID)
-      await checkStatus(accountID, productName, productCurrency, productPrice, productImage, baseURL, checkoutID)
+      await checkStatus(accountID, baseURL, checkoutID)
     } else if (checkoutID === "ERROR") {
       if (loginRequired) {
         console.log("bug, login required")
